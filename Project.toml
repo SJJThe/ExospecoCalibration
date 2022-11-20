@@ -1,0 +1,4 @@
+name = "ExospecoCalibration"
+uuid = "62678add-b728-45b6-bdcd-9e69f53ee567"
+authors = ["Samuel Thé <the.samuel.ad@gmail.com>"]
+version = "0.1.0"
