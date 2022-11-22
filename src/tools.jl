@@ -1,13 +1,5 @@
 
 
-# Used to specify an optional argument of type T.
-const Optional{T} = Union{T,UndefInitializer}
-
-@noinline throw_bad_argument(args...) = throw_bad_argument(string(args...))
-@noinline throw_bad_argument(mesg::AbstractString) = throw(ArgumentError(mesg))
-
-@noinline throw_dimension_mismatch(args...) = throw_dimension_mismatch(string(args...))
-@noinline throw_dimension_mismatch(mesg::AbstractString) = throw(DimensionMismatch(mesg))
 
 """
     tolerance(atol, rtol, val) -> max(atol, rtol*abs(val))
@@ -45,14 +37,15 @@ coordinates are stored in `L_peak`.
 """
 function detect_spectral_lines(d_cal::AbstractMatrix{T},
     bpm::AbstractMatrix{T};
-    study::Val = Val(false)) where {T<:AbstractFloat}
+    plot::Bool = false,
+    func::Bool = false) where {T<:AbstractFloat}
     
     function f_obj(p)
         wgts, ind_prof, prof = project(d_cal, p; weights=bpm)
         inds = find_peaks(prof; weights=wgts, dist=10, nmax=6)
         return sum(prof[inds])
     end
-    if study === Val(:func)
+    if func
         return f_obj
     end
     
@@ -61,8 +54,7 @@ function detect_spectral_lines(d_cal::AbstractMatrix{T},
     w_perp, ind_q_perp, q_perp = project(d_cal, ϕ_λ*deg; weights=bpm)
     L_peak = find_peaks(q_perp; weights=w_perp, dist=10, nmax=6)
     
-    if study === Val(:log)
-        #FIXME: add export figure in a log file
+    if plot
         figure()
         plt.plot(ind_q_perp, q_perp)
         plt.scatter(ind_q_perp[L_peak], q_perp[L_peak], color="r", marker="x")
@@ -185,6 +177,17 @@ end
 
 
 
+
+# Used to specify an optional argument of type T.
+const Optional{T} = Union{T,UndefInitializer}
+
+@noinline throw_bad_argument(args...) = throw_bad_argument(string(args...))
+@noinline throw_bad_argument(mesg::AbstractString) = throw(ArgumentError(mesg))
+
+@noinline throw_dimension_mismatch(args...) = throw_dimension_mismatch(string(args...))
+@noinline throw_dimension_mismatch(mesg::AbstractString) = throw(DimensionMismatch(mesg))
+
+
 """
     find_peaks(vect; kwds...) -> inds
 
@@ -236,7 +239,7 @@ function find_peaks!(vect::AbstractVector{<:Real};
     dst = Int(dist) - 1
     vmin = typemin(eltype(vect))
     vtol = float(atol)
-    I = axes1(vect)
+    I = Base.axes1(vect)
     I_first, I_last = first(I), last(I)
     inds = Int[]
     if weights !== undef
@@ -404,13 +407,14 @@ function find_edges_coro(ϕ_λ::Float64,
     bpm::AbstractArray{Float64,2},
     L_peak::AbstractVector;
     half_width_box::Int = 10,
-    study::Val = Val(false))
+    plot::Bool = false,
+    study::Bool = false)
 
     sinphi, cosphi = sincos(ϕ_λ)
     imin, imax = firstindex(axes(d_cal,1)), lastindex(axes(d_cal,1))
     jmin, jmax = firstindex(axes(d_cal,2)), lastindex(axes(d_cal,2))
     edges_coro = Vector{Point{Float64}}[]
-    if study === Val(true)
+    if study
         prof_stud = []
         ind_prof_stud = []
         ind_edges_stud = []
@@ -440,7 +444,7 @@ function find_edges_coro(ϕ_λ::Float64,
         wgts, ind_prof, prof = project(lamp_clip, ϕ_λ + 90deg; weights=mask)
 
         # get ends of edges of segment
-        if study === Val(true)
+        if study
             edges, tol = find_edges(prof; weights=wgts, study=study)
         else
             edges = find_edges(prof; weights=wgts)
@@ -452,7 +456,7 @@ function find_edges_coro(ϕ_λ::Float64,
         j_l_u = L_peak[l]*sinphi + ind_prof[edges[2]]*cosphi
         
         push!(edges_coro, [Point(i_l_d, j_l_d), Point(i_l_u, j_l_u)])
-        if (study === Val(true)) && (l == 5)
+        if study && (l == 4)
             prof_stud = prof
             ind_prof_stud = ind_prof
             ind_edges_stud = [i_l_d, i_l_u]
@@ -460,8 +464,7 @@ function find_edges_coro(ϕ_λ::Float64,
         end
     end
 
-    if study === Val(:log)
-        #FIXME: add export figure in a log file
+    if plot
         figure()
         plt.imshow(d_cal .* bpm, origin="lower", interpolation="none", 
                    aspect="auto", cmap="gnuplot")
@@ -473,7 +476,7 @@ function find_edges_coro(ϕ_λ::Float64,
         plt.tight_layout()
     end
     
-    if study === Val(true)
+    if study
         return edges_coro, prof_stud, ind_prof_stud, ind_edges_stud, tol_stud
     else
         return edges_coro
@@ -653,5 +656,22 @@ function build_model_fit(polynom_carac::NTuple{2,Int},
     end
 
     return vcat(H...), d
+end
+
+
+"""
+"""
+function build_map(P::PolynLaw{N,T,D},
+    s::Tuple{Int,Int}) where {N,T,D}
+    
+    map = Array{T,N}(undef, s)
+    for i in 1:size(map, 1)
+        for j in 1:size(map, 2)
+            pt = Point(i,j)
+            map[i,j] = P(pt)
+        end
+    end
+    
+    return map
 end
 

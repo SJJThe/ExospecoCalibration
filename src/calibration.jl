@@ -17,14 +17,15 @@ function calibrate_geometry(d_cal::AbstractArray{T,N},
     bpm::AbstractArray{T,N} = ones(size(data,1), size(data,2));
     spatial_law_carac::NTuple{2,Int} = (2, 1),
     spectral_law_carac::NTuple{2,Int} = (2, 5),
-    study::Val = Val(false),
+    plot::Bool = false,
+    study::Bool = false,
     wordy::Bool = false) where {T,N}
 
     @assert axes(d_cal) == axes(bpm)
     
     wordy && println("+ Geometric calibration")
     # Detect the calibrated coordinates
-    C_paths, Edges = detect_calibrated_coordinates(d_cal, bpm; study=study, 
+    C_paths, Edges = detect_calibrated_coordinates(d_cal, bpm; plot=plot, 
                                                    wordy=wordy)
     # Model the dispersion laws
     spatial_law, spectral_law = model_dispersion_laws(C_paths, Edges; 
@@ -39,8 +40,7 @@ function calibrate_geometry(d_cal::AbstractArray{T,N},
     # Create geometric calibration structure
     G = GeoCalib(rho_map, lambda_map, bpm)
 
-    if study === Val(:log)
-        #FIXME: add export figure in a log file
+    if plot
         figure()
         plt.imshow(d_cal .* bpm, origin="lower", interpolation="none", 
                    aspect="auto", cmap="gnuplot")
@@ -50,7 +50,7 @@ function calibrate_geometry(d_cal::AbstractArray{T,N},
         plt.tight_layout()
     end
 
-    if study == Val(true)
+    if study
         return rho_map, lambda_map, C_paths, Edges, spatial_law, spectral_law
     else
         return G
@@ -63,16 +63,17 @@ end
 """
 function detect_calibrated_coordinates(d_cal::AbstractArray{T,N},
     bpm::AbstractArray{T,N};
+    plot::Bool = false,
     study::Val = Val(false),
     wordy::Bool = false) where {T,N}
 
     wordy && println("|-- Detection of calibrated coordinates")
     # projected positions of spectral lines
-    ϕ_lambda, L_peak = detect_spectral_lines(d_cal, bpm; study=study)
+    ϕ_lambda, L_peak = detect_spectral_lines(d_cal, bpm; plot=plot)
     # spectral line paths
     C_paths = find_spectral_line_paths(d_cal, bpm, L_peak, ϕ_lambda*deg)
     # edges of cronagraphic mask
-    Edges = find_edges_coro(ϕ_lambda*deg, d_cal, bpm, L_peak; study=study)
+    Edges = find_edges_coro(ϕ_lambda*deg, d_cal, bpm, L_peak; plot=plot)
     
     return C_paths, Edges
 end
@@ -106,7 +107,7 @@ end
 
 """
 """
-lambda_ref(lambda_map::AbstractMatrix{T}) where {T,N} = maximum(lambda_map)
+lambda_ref(lambda_map::AbstractMatrix{T}) where {T} = maximum(lambda_map)
 
 
 
@@ -114,7 +115,7 @@ lambda_ref(lambda_map::AbstractMatrix{T}) where {T,N} = maximum(lambda_map)
 """
 function select_region_of_interest(rho_map::AbstractMatrix{T},
     lambda_map::AbstractMatrix{T},
-    bpm::AbstractMatrix{T} = ones(size(rho_map));
+    bpm::AbstractMatrix{T} = ones(T, size(rho_map));
     rho_bnds::NTuple{2,T} = (-25rho_pixel, 25rho_pixel),
     lambda_bnds::NTuple{2,T} = (minimum(lambda_map), maximum(lambda_map)),
     wordy::Bool = false) where {T}
@@ -138,11 +139,10 @@ end
 
 function select_region_of_interest(G::GeoCalib{T};
     rho_bnds::NTuple{2,T} = (0.0, 0.0),
-    lambda_bnds::NTuple{2,T} = (minimum(get_spectral_map(G)), 
-                                maximum(get_spectral_map(G))),
+    lambda_bnds::NTuple{2,T} = (minimum(G.lambda),maximum(G.lambda)),
     kwds...) where {T}
 
-    return select_region_of_interest(get_spatial_map(G), get_spectral_map(G),
-                                     get_mask(G); rho_bnds=rho_bnds,
+    return select_region_of_interest(G.rho, G.lambda, G.mask; 
+                                     rho_bnds=rho_bnds,
                                      lambda_bnds=lambda_bnds, kwds...)
 end

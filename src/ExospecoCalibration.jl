@@ -8,6 +8,9 @@
 #
 
 #TODO: add export figure in a log file
+#FIXME: update doc
+#TODO: use Unitful
+#TODO: use Requires
 
 module ExospecoCalibration
 
@@ -16,18 +19,13 @@ export GeoCalib,
        build_map,
        calibrate_geometry,
        detect_calibrated_coordinates,
-       get_mask,
-       get_spatial_map,
-       get_spectral_map,
        model_dispersion_laws,
-       read,
+       readfits,
        select_region_of_interest,
-       write
+       writefits
 
 
-using Base: axes1
 using EasyFITS
-import EasyFITS: write, hduname, read
 using LinearAlgebra
 using OptimPackNextGen: BraDi
 using PyPlot
@@ -38,6 +36,7 @@ using TwoDimensional
 
 """ Wavelengh units (all wavelengths in nanometers) """
 const nm  = 1.0    # one nanometer
+""" Wavelengh units  """
 const µm  = 1000nm # one micrometer
 
 """ Angular distance units (all angular distances in milliarcseconds) """
@@ -54,7 +53,7 @@ const deg = π/180
 
 
 include("types.jl")
-include("calibration.jl")
 include("tools.jl")
+include("calibration.jl")
 
 end # module

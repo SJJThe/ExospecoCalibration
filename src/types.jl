@@ -2,75 +2,68 @@
 
 """
 """
-struct GeoCalib{T<:Real}
-    rho_map::AbstractMatrix{T}
-    lambda_map::AbstractMatrix{T}
-    mask::AbstractMatrix{T}
+struct GeoCalib{T<:AbstractFloat,R<:AbstractMatrix{T},L<:AbstractMatrix{T},
+                M<:AbstractMatrix{T}}
+    rho::R
+    lambda::L
+    mask::M
 
-    function GeoCalib{T}(rho_map::AbstractMatrix{T}, 
-                         lambda_map::AbstractMatrix{T}, 
-                         mask::AbstractMatrix{T}) where {T<:Real}
-        @assert axes(rho_map) == axes(lambda_map) == axes(mask)
-        return new{T}(rho_map, lambda_map, mask)
+    function GeoCalib(rho::R, 
+                      lambda::L, 
+                      mask::M = ones(T, size(rho))) where {T<:AbstractFloat,
+                                                           R<:AbstractMatrix{T},
+                                                           L<:AbstractMatrix{T},
+                                                           M<:AbstractMatrix{T}}
+        @assert axes(rho) == axes(lambda) == axes(mask)
+        return new{T,R,L,M}(rho, lambda, mask)
     end
 end
-get_spatial_map(G::GeoCalib) = G.rho_map
-get_spectral_map(G::GeoCalib) = G.lambda_map
-get_mask(G::GeoCalib) = G.mask
 
-function GeoCalib(rho_map::AbstractMatrix{T}, 
-    lambda_map::AbstractMatrix{T}, 
-    mask::AbstractMatrix{T} = ones(size(rho_map))) where {T<:Real}
-
-    return GeoCalib{T}(rho_map, lambda_map, mask)
-end
-
-Base.size(G::GeoCalib) = size(get_spatial_map(G))
-Base.eltype(G::GeoCalib{T}) where {T} = T
+Base.axes(G::GeoCalib) = axes(G.rho)
+Base.size(G::GeoCalib) = size(G.rho)
+Base.eltype(G::GeoCalib) = eltype(typeof(G))
+Base.eltype(::Type{<:GeoCalib{T}}) where {T} = T
 Base.show(io::IO, G::GeoCalib{T}) where {T} = begin
     print(io,"GeoCalib{$T}:")
-    print(io,"\n - spatial dispersion map `rho_map` : ",typeof(get_spatial_map(G)))
-    print(io,"\n - spectral dispersion map `lambda_map` : ",typeof(get_spectral_map(G)))
-    print(io,"\n - mask of valid data `mask` : ",typeof(get_mask(G)))
+    print(io,"\n - spatial dispersion map `rho` : ",typeof(G.rho))
+    print(io,"\n - spectral dispersion map `lambda` : ",typeof(G.lambda))
+    print(io,"\n - mask of valid data `mask` : ",typeof(G.mask))
 end
 
+# Extend EasyFITS method to provide HDU name and revision number.
+EasyFITS.hduname(::Type{<:GeoCalib}) = ("GEOMETRIC-CALIBRATION", 1)
 
-""" Extend EasyFITS method to provide HDU name and revision number. """
-hduname(::Type{<:GeoCalib}) = ("GEOMETRIC-CALIBRATION", 1)
-
-function EasyFITS.write(::Type{FitsFile},
-    path::AbstractString,
+"""
+give exemple writefits(...; overwrite=true)
+"""
+function EasyFITS.writefits(path::AbstractString,
     G::GeoCalib{T};
-    overwrite::Bool = false,
     kwds...) where {T}
 
-    rho_map, lambda_map, mask = get_spatial_map(G), get_spectral_map(G), get_mask(G)
-    arr = Array{T}(undef, size(rho_map, 1), size(rho_map, 2), 3)
-    arr[:,:,1] = rho_map
-    arr[:,:,2] = lambda_map
+    rho, lambda, mask = G.rho, G.lambda, G.mask
+    arr = Array{T}(undef, size(rho)..., 3)
+    arr[:,:,1] = rho
+    arr[:,:,2] = lambda
     arr[:,:,3] = mask
     
     name, vers = hduname(G)
-    hdr["HDUNAME"] = (name, "Geometric Calibration")
-    hdr["HDUVERS"] = (vers, "version of this format")
-    hdr["SIZE"] = "$(size(rho_map,1)), $(size(rho_map,2)), 3" 
-    hdr["TYPE"] = "$(T)"
-    hdr["ARRAY-1"] = "Angular Separation Map"
-    hdr["ARRAY-2"] = "Wavelength Map"
-    hdr["ARRAY-3"] = "Mask"
-
-    EasyFITS.write(FitsFile, path, hdr, arr; overwrite=overwrite, kwds...)
+    hdr = FitsHeader("HDUNAME" => "Geometric Calibration", 
+                     "HDUVERS" => "Version of this format",
+                     "SLICE_1" => "Angular separation map [mas]",
+                     "SLICE_2" => "Wavelength map [nm]",
+                     "SLICE_2" => "Mask of valid data")
+    
+    EasyFITS.writefits(path, hdr, arr; kwds...)
     nothing
 end
 
-function EasyFITS.read(::Type{GeoCalib{T}}, 
-    path::AbstractString) where {T}
+function EasyFITS.readfits(::Type{GeoCalib}, 
+    path::AbstractString)
     
-    arr = read(FitsArray, path)
+    arr = readfits(path)
 
     return GeoCalib(arr[:,:,1], arr[:,:,2], arr[:,:,3])
 end
-
 
 
 
@@ -96,26 +89,6 @@ struct PolynLaw{N,T,D} <: Function
 end
 get_coefs(P::PolynLaw{N,T,D}) where {N,T,D} =P.coefs
 
-# function EasyFITS.write(::Type{FitsFile}, 
-#     path::AbstractString, 
-#     P::PolynLaw{N,T,D}; 
-#     kwds...) where {N,T,D}
-    
-#     coefs = get_coefs(P)
-#     hdr = FitsHeader("Dimension" => N, "Degree" => D)
-#     EasyFITS.write(FitsFile, path, hdr, coefs; kwds...)
-#     nothing
-# end
-
-# function EasyFITS.read(::Type{<:PolynLaw{N,T,D}}, 
-#     path::AbstractString) where {N,T,D}
-    
-#     coefs = read(FitsArray, path)
-#     hdr = read(FitsHeader, path)
-
-#     return PolynLaw{hdr["DIMENSION"],eltype(coefs),hdr["DEGREE"]}(coefs)
-# end
-
 function (P::PolynLaw{N,T,D})(pt) where {N,T,D}
     
     mdl = PolynMdl{N,T,D}(pt)
@@ -123,29 +96,6 @@ function (P::PolynLaw{N,T,D})(pt) where {N,T,D}
     return mdl(get_coefs(P))
 end
 
-# function (P::PolynLaw{N,T,D})(coord::AbstractArray{U,N}) where {N,T,D,U}
-    
-#     map = Array{T,N}(undef, size(coord))
-#     for k in eachindex(coord)
-#         map[k] = P(coord[k])
-#     end
-
-#     return map
-# end
-
-function build_map(P::PolynLaw{N,T,D},
-    s::Tuple{Int,Int}) where {N,T,D}
-    
-    map = Array{T,N}(undef, s)
-    for i in 1:size(map, 1)
-        for j in 1:size(map, 2)
-            pt = Point(i,j)
-            map[i,j] = P(pt)
-        end
-    end
-    
-    return map
-end
 
 
 
