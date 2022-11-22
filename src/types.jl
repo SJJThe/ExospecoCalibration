@@ -1,6 +1,81 @@
 
 
 """
+"""
+struct GeoCalib{T<:Real}
+    rho_map::AbstractMatrix{T}
+    lambda_map::AbstractMatrix{T}
+    mask::AbstractMatrix{T}
+
+    function GeoCalib{T}(rho_map::AbstractMatrix{T}, 
+                         lambda_map::AbstractMatrix{T}, 
+                         mask::AbstractMatrix{T}) where {T<:Real}
+        @assert axes(rho_map) == axes(lambda_map) == axes(mask)
+        return new{T}(rho_map, lambda_map, mask)
+    end
+end
+get_spatial_map(G::GeoCalib) = G.rho_map
+get_spectral_map(G::GeoCalib) = G.lambda_map
+get_mask(G::GeoCalib) = G.mask
+
+function GeoCalib(rho_map::AbstractMatrix{T}, 
+    lambda_map::AbstractMatrix{T}, 
+    mask::AbstractMatrix{T} = ones(size(rho_map))) where {T<:Real}
+
+    return GeoCalib{T}(rho_map, lambda_map, mask)
+end
+
+Base.size(G::GeoCalib) = size(get_spatial_map(G))
+Base.eltype(G::GeoCalib{T}) where {T} = T
+Base.show(io::IO, G::GeoCalib{T}) where {T} = begin
+    print(io,"GeoCalib{$T}:")
+    print(io,"\n - spatial dispersion map `rho_map` : ",typeof(get_spatial_map(G)))
+    print(io,"\n - spectral dispersion map `lambda_map` : ",typeof(get_spectral_map(G)))
+    print(io,"\n - mask of valid data `mask` : ",typeof(get_mask(G)))
+end
+
+
+""" Extend EasyFITS method to provide HDU name and revision number. """
+hduname(::Type{<:GeoCalib}) = ("GEOMETRIC-CALIBRATION", 1)
+
+function EasyFITS.write(::Type{FitsFile},
+    path::AbstractString,
+    G::GeoCalib{T};
+    overwrite::Bool = false,
+    kwds...) where {T}
+
+    rho_map, lambda_map, mask = get_spatial_map(G), get_spectral_map(G), get_mask(G)
+    arr = Array{T}(undef, size(rho_map, 1), size(rho_map, 2), 3)
+    arr[:,:,1] = rho_map
+    arr[:,:,2] = lambda_map
+    arr[:,:,3] = mask
+    
+    name, vers = hduname(G)
+    hdr["HDUNAME"] = (name, "Geometric Calibration")
+    hdr["HDUVERS"] = (vers, "version of this format")
+    hdr["SIZE"] = "$(size(rho_map,1)), $(size(rho_map,2)), 3" 
+    hdr["TYPE"] = "$(T)"
+    hdr["ARRAY-1"] = "Angular Separation Map"
+    hdr["ARRAY-2"] = "Wavelength Map"
+    hdr["ARRAY-3"] = "Mask"
+
+    EasyFITS.write(FitsFile, path, hdr, arr; overwrite=overwrite, kwds...)
+    nothing
+end
+
+function EasyFITS.read(::Type{GeoCalib{T}}, 
+    path::AbstractString) where {T}
+    
+    arr = read(FitsArray, path)
+
+    return GeoCalib(arr[:,:,1], arr[:,:,2], arr[:,:,3])
+end
+
+
+
+
+
+"""
 #FIXME: update doc
 """
 struct PolynLaw{N,T,D} <: Function

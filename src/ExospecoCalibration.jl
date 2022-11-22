@@ -12,14 +12,22 @@
 module ExospecoCalibration
 
 
-export build_map,
+export GeoCalib,
+       build_map,
        calibrate_geometry,
        detect_calibrated_coordinates,
+       get_mask,
+       get_spatial_map,
+       get_spectral_map,
        model_dispersion_laws,
-       select_region_of_interest
+       read,
+       select_region_of_interest,
+       write
 
 
 using Base: axes1
+using EasyFITS
+import EasyFITS: write, hduname, read
 using LinearAlgebra
 using OptimPackNextGen: BraDi
 using PyPlot

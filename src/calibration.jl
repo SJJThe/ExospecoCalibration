@@ -15,8 +15,8 @@ behavior. By default, `bpm` is an `AbstractArray` filled with ones.
 """
 function calibrate_geometry(d_cal::AbstractArray{T,N},
     bpm::AbstractArray{T,N} = ones(size(data,1), size(data,2));
-    spectral_law_carac::NTuple{2,Int} = (2, 5),
     spatial_law_carac::NTuple{2,Int} = (2, 1),
+    spectral_law_carac::NTuple{2,Int} = (2, 5),
     study::Val = Val(false),
     wordy::Bool = false) where {T,N}
 
@@ -36,6 +36,9 @@ function calibrate_geometry(d_cal::AbstractArray{T,N},
     rho_map = build_map(spatial_law, size(d_cal))
     lambda_map = build_map(spectral_law, size(d_cal))
 
+    # Create geometric calibration structure
+    G = GeoCalib(rho_map, lambda_map, bpm)
+
     if study === Val(:log)
         #FIXME: add export figure in a log file
         figure()
@@ -50,7 +53,7 @@ function calibrate_geometry(d_cal::AbstractArray{T,N},
     if study == Val(true)
         return rho_map, lambda_map, C_paths, Edges, spatial_law, spectral_law
     else
-        return rho_map, lambda_map
+        return G
     end
 end
 
@@ -81,8 +84,8 @@ end
 function model_dispersion_laws(C_paths::Vector{Vector{Point{Float64}}},
     Edges::Vector{Vector{Point{Float64}}};
     calibrated_wavelengths::AbstractVector{T} = IRDIS_calibrated_lambda,
-    spectral_law_carac::NTuple{2,Int} = (2, 5),
     spatial_law_carac::NTuple{2,Int} = (2, 1),
+    spectral_law_carac::NTuple{2,Int} = (2, 5),
     wordy::Bool = false) where {T}
 
     wordy && println("|-- Modeling dispersion laws")
@@ -112,8 +115,8 @@ lambda_ref(lambda_map::AbstractMatrix{T}) where {T,N} = maximum(lambda_map)
 function select_region_of_interest(rho_map::AbstractMatrix{T},
     lambda_map::AbstractMatrix{T},
     bpm::AbstractMatrix{T} = ones(size(rho_map));
-    lambda_bnds::NTuple{2,T} = (minimum(lambda_map), maximum(lambda_map)),
     rho_bnds::NTuple{2,T} = (-25rho_pixel, 25rho_pixel),
+    lambda_bnds::NTuple{2,T} = (minimum(lambda_map), maximum(lambda_map)),
     wordy::Bool = false) where {T}
     
     wordy && println("|-- Select region of interest")
@@ -130,5 +133,16 @@ function select_region_of_interest(rho_map::AbstractMatrix{T},
     # mask of invaled pixels
     mask = bpm .* mask_lambda .* mask_rho
 
-    return mask
+    return GeoCalib(rho_map, lambda_map, mask)
+end
+
+function select_region_of_interest(G::GeoCalib{T};
+    rho_bnds::NTuple{2,T} = (0.0, 0.0),
+    lambda_bnds::NTuple{2,T} = (minimum(get_spectral_map(G)), 
+                                maximum(get_spectral_map(G))),
+    kwds...) where {T}
+
+    return select_region_of_interest(get_spatial_map(G), get_spectral_map(G),
+                                     get_mask(G); rho_bnds=rho_bnds,
+                                     lambda_bnds=lambda_bnds, kwds...)
 end

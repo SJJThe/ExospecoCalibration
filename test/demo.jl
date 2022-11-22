@@ -17,33 +17,30 @@ spectral_law_carac = (2,5)
 spatial_law_carac = (2,1)
 
 # Generated calibration maps of the detector geometry
-ρ_map, λ_map = calibrate_geometry(d_cal, bpm;
-                                  spectral_law_carac=spectral_law_carac,
-                                  spatial_law_carac=spatial_law_carac,
-                                  wordy=true, study=Val(:log))
-                                  
+Geo = calibrate_geometry(d_cal, bpm; spatial_law_carac=spatial_law_carac,
+                         spectral_law_carac=spectral_law_carac,
+                         wordy=true, study=Val(:log))
+
 
 # Boundaries of region of interest
-λ_bnds = (920.0, 1870.0) .* ExospecoCalibration.nm
-ρ_bnds = (-15.0, 15.0) .* ExospecoCalibration.rho_pixel
+rho_map, lambda_map = get_spatial_map(Geo), get_spectral_map(Geo)
+lambda_bnds = (920.0, 1870.0) .* ExospecoCalibration.nm
+rho_bnds = (-15.0, 15.0) .* ExospecoCalibration.rho_pixel
 
 d = read(FitsArray, joinpath(path_to_data, "preprocessed_data.fits"))
 figure()
 plt.imshow(d[:,:,1], origin="lower", interpolation="none", aspect="auto", 
            cmap="gnuplot", vmin=0.0, vmax=1.0)
 plt.colorbar()
-contour(λ_map; levels=λ_bnds, colors="tab:blue")
-contour(ρ_map; levels=ρ_bnds, colors="green")
+contour(lambda_map; levels=lambda_bnds, colors="tab:blue")
+contour(rho_map; levels=rho_bnds, colors="green")
 
 # Select the region of interest taken into account
-mask = select_region_of_interest(ρ_map, λ_map, bpm; 
-                                 lambda_bnds=λ_bnds, rho_bnds=ρ_bnds)
+Geo_masked = select_region_of_interest(Geo; rho_bnds=rho_bnds,
+                                       lambda_bnds=lambda_bnds)
 
 
 # Save the geometric calibration
-geo_calib = Array{Float64,3}(undef, size(d_cal,1), size(d_cal,2), 3)
-geo_calib[:,:,1] = ρ_map
-geo_calib[:,:,2] = λ_map
-geo_calib[:,:,3] = mask
-write(FitsFile, joinpath(path_to_data, "geometric_calibration.fits"), geo_calib; 
-      overwrite=true)
+write(FitsFile, joinpath(path_to_data, "geometric_calibration.fits"), 
+      Geo_masked; overwrite=true)
+
