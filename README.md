@@ -50,13 +50,18 @@ The package also allows writing and reading fits files based on `GeoCalib` struc
 ```julia
 # Reading Geometric calibration
 path_to_struct = "..."
-Geo = read(fitsArray, path_to_struct)
+Geo = readfits(path_to_struct)
 
 # Writing GeoCalib structure
-write(FitsFile, path_to_struct, Geo; overwrite=true)
+writefits(path_to_struct, Geo; overwrite=true)
 ```
 
 
 ## Dependencies
 
+`ExospecoCalibration` depends on the following packages:
+ - [EasyFITS](https://github.com/emmt/EasyFITS.jl)
+ - [OptimPackNextGen](https://github.com/emmt/OptimPackNextGen.jl)
+ - [TwoDimensional](https://github.com/emmt/TwoDimensional.jl)
 
+For more details, see the `Project.toml` file.
