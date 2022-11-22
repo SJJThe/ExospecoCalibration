@@ -127,7 +127,8 @@ function select_region_of_interest(rho_map::AbstractMatrix{T},
 
     # select all pixels between the maxima angular distances and rho_bnds[1]
     # and rho_bnds[2]
-    map_gamma_rho = (lambda_ref(lambda_map) ./ lambda_map) .* rho_map
+    gamma = lambda_ref(lambda_map) ./ lambda_map
+    map_gamma_rho = gamma .* rho_map
     mask_rho = (minimum(rho_map) .<= map_gamma_rho .<= rho_bnds[1]) + 
                (rho_bnds[2] .<= map_gamma_rho .<= maximum(rho_map))
 

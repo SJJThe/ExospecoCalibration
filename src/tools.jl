@@ -66,6 +66,9 @@ end
 
 
 
+# Used to specify an optional argument of type T.
+const Optional{T} = Union{T,UndefInitializer}
+
 """
     project(A, θ; weights=undef) -> w, x, y
 
@@ -178,8 +181,6 @@ end
 
 
 
-# Used to specify an optional argument of type T.
-const Optional{T} = Union{T,UndefInitializer}
 
 @noinline throw_bad_argument(args...) = throw_bad_argument(string(args...))
 @noinline throw_bad_argument(mesg::AbstractString) = throw(ArgumentError(mesg))
@@ -239,7 +240,7 @@ function find_peaks!(vect::AbstractVector{<:Real};
     dst = Int(dist) - 1
     vmin = typemin(eltype(vect))
     vtol = float(atol)
-    I = Base.axes1(vect)
+    I = axes1(vect)
     I_first, I_last = first(I), last(I)
     inds = Int[]
     if weights !== undef

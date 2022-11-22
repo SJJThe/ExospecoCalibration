@@ -25,6 +25,7 @@ export GeoCalib,
        writefits
 
 
+import Base: axes1
 using EasyFITS
 using LinearAlgebra
 using OptimPackNextGen: BraDi

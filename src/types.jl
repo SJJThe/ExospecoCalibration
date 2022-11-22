@@ -46,21 +46,20 @@ function EasyFITS.writefits(path::AbstractString,
     arr[:,:,2] = lambda
     arr[:,:,3] = mask
     
-    name, vers = hduname(G)
-    hdr = FitsHeader("HDUNAME" => "Geometric Calibration", 
-                     "HDUVERS" => "Version of this format",
+    name, vers = EasyFITS.hduname(G)
+    hdr = FitsHeader("HDUNAME" => name, 
+                     "HDUVERS" => vers,
                      "SLICE_1" => "Angular separation map [mas]",
                      "SLICE_2" => "Wavelength map [nm]",
-                     "SLICE_2" => "Mask of valid data")
+                     "SLICE_3" => "Mask of valid data")
     
     EasyFITS.writefits(path, hdr, arr; kwds...)
     nothing
 end
 
-function EasyFITS.readfits(::Type{GeoCalib}, 
-    path::AbstractString)
+function EasyFITS.readfits(path::AbstractString)
     
-    arr = readfits(path)
+    arr = read(FitsArray, path)
 
     return GeoCalib(arr[:,:,1], arr[:,:,2], arr[:,:,3])
 end
