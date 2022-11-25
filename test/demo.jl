@@ -33,7 +33,7 @@ Geo_masked = select_region_of_interest(Geo; rho_bnds=rho_bnds,
 
 
 # Save calibration
-writefits(joinpath(path_to_data, "geomtric_calibration.fits"), 
+writefits(joinpath(path_to_data, "geometric_calibration.fits"), 
           Geo_masked; overwrite=true)
 
 

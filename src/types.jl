@@ -57,7 +57,7 @@ function EasyFITS.writefits(path::AbstractString,
     nothing
 end
 
-function EasyFITS.readfits(path::AbstractString)
+function EasyFITS.readfits(::Type{GeoCalib}, path::AbstractString)
     
     arr = read(FitsArray, path)
 
