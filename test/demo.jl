@@ -19,7 +19,7 @@ spatial_law_carac = (2,1)
 # Generated calibration maps of the detector geometry
 Geo = calibrate_geometry(d_cal, bpm; spatial_law_carac=spatial_law_carac,
                          spectral_law_carac=spectral_law_carac,
-                         wordy=true, plot=true)
+                         wordy=true, study=Val(:log))
 
 
 # Boundaries of region of interest

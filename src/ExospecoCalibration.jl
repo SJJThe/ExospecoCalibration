@@ -8,8 +8,6 @@
 #
 
 #TODO: add export figure in a log file
-#FIXME: update doc
-#FIXME: update angles of projections
 #TODO: use Unitful
 #TODO: use Requires
 

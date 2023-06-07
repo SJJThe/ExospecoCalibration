@@ -46,7 +46,6 @@ Base.show(io::IO, G::GeoCalib{T}) where {T} = begin
     print(io,"\n - mask of valid data `mask` : ",typeof(G.mask))
 end
 
-#FIXME: extend Base.write and 
 
 # Extend EasyFITS method to provide HDU name and revision number.
 EasyFITS.hduname(::Type{<:GeoCalib}) = ("GEOMETRIC-CALIBRATION", 1)

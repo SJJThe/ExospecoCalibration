@@ -24,12 +24,13 @@ end
     detect_spectral_lines(d_cal, bpm) -> ϕ_λ, L_peak
 
 Yields the projected coordinates of the calibrated spectral lines in 
-calibration data `d_cal`, sorted from the highest to the lowest wavelength in 
-`L_peak`. The BraDi method is used to find the best projection angle `ϕ_λ` that
-will ensure the highest heights of the spectral lines peaks.
+calibration data `d_cal`, sorted from the lowest to the highest wavelength in 
+`L_peak`. The BraDi method is used to find the best projection angle `ϕ_λ`
+(given in degrees) that will ensure the highest heights of the spectral lines
+peak.
 
 The keyword `study` can be given the value `Val(:func)` to return only the 
-function `f_obj` that gives the sum of peaks heights, given an angle `p` in 
+function `f_obj` that gives the sum of peaks heights, given an angle `phi_rad` in 
 radian. If the value `Val(:log)` is given, it will plot the resulting profile 
 `q_perp` as well as the estimated location of the most significant peaks, whose
 coordinates are stored in `L_peak`.
@@ -37,11 +38,11 @@ coordinates are stored in `L_peak`.
 """
 function detect_spectral_lines(d_cal::AbstractMatrix{T},
     bpm::AbstractMatrix{T};
-    plot::Bool = false,
+    study::Val = Val(false),
     func::Bool = false) where {T<:AbstractFloat}
     
-    function f_obj(p)
-        wgts, ind_prof, prof = project(d_cal, p; weights=bpm)
+    function f_obj(phi_rad)
+        wgts, ind_prof, prof = project(d_cal, phi_rad; weights=bpm)
         inds = find_peaks(prof; weights=wgts, dist=10, nmax=6)
         return sum(prof[inds])
     end
@@ -49,12 +50,12 @@ function detect_spectral_lines(d_cal::AbstractMatrix{T},
         return f_obj
     end
     
-    ϕ_λ = BraDi.maximize(p -> f_obj(p*deg), [80.0, 100.0]; atol=0.0, rtol=1e-4)[1]
+    ϕ_λ = BraDi.maximize(p -> f_obj(p*deg), [-20.0, 20.0]; atol=0.0, rtol=1e-4)[1]
     
     w_perp, ind_q_perp, q_perp = project(d_cal, ϕ_λ*deg; weights=bpm)
     L_peak = find_peaks(q_perp; weights=w_perp, dist=10, nmax=6)
     
-    if plot
+    if study === Val(:log)
         figure()
         plt.plot(ind_q_perp, q_perp)
         plt.scatter(ind_q_perp[L_peak], q_perp[L_peak], color="r", marker="x")
@@ -80,9 +81,9 @@ weights of same indices as `A`.
 
 The result is a 3-tuple of vectors `w`, `x` and `y` such that:
 
-    w[k] = sum_{i,j} f(x[k] - i*cos(θ) - j*sin(θ))*W[i,j]
+    w[k] = sum_{i,j} f(x[k] - i*sin(θ) - j*cos(θ))*W[i,j]
     x[k] = k-th projected index
-    y[k] = (sum_{i,j} f(x[k] - i*cos(θ) - j*sin(θ))*A[i,j]*W[i,j])/w[k]
+    y[k] = (sum_{i,j} f(x[k] - i*sin(θ) - j*cos(θ))*A[i,j]*W[i,j])/w[k]
 
 where `f(t) = max(1 - abs(t), 0)` is the linear interpolation B-spline and
 `W[i,j] = 1` if `weights = undef` (the default) or `W[i,j] = weights[i,j]`
@@ -107,7 +108,7 @@ function project(A::AbstractMatrix, θ::Real;
     end
     sinθ, cosθ = sincos(T(θ))
     I, J = axes(A)
-    zmin, zmax = projection_limits(cosθ, I, sinθ, J)
+    zmin, zmax = projection_limits(sinθ, I, cosθ, J)
     xmin = floor(Int, zmin)
     xmax = floor(Int, zmax) + 1
     x = xmin:xmax
@@ -118,7 +119,7 @@ function project(A::AbstractMatrix, θ::Real;
     if weights === undef
         @inbounds for j in J
             for i in I
-                z = cosθ*i + sinθ*j
+                z = sinθ*i + cosθ*j
                 r = z - floor(z)
                 k = floor(Int, z) + off
                 if (1 ≤ k < n)&(0 ≤ r ≤ 1)
@@ -137,7 +138,7 @@ function project(A::AbstractMatrix, θ::Real;
             for i in I
                 w_ij = T(weights[i,j])
                 if w_ij > 0
-                    z = cosθ*i + sinθ*j
+                    z = sinθ*i + cosθ*j
                     r = z - floor(z)
                     k = floor(Int, z) + off
                     if (1 ≤ k < n)&(0 ≤ r ≤ 1)
@@ -277,11 +278,10 @@ end
 """
     LineStat(cog_int, cog_pos, max_int, max_pos)
 
-Structure that contains the level and position of the center of gravity and maximum
-of a closed area around a peak of the calibration wavelength data. The area is 
-defined in the function `find_projected_positions`.
+Structure that contains the level and position (via a `Point` structure) of the
+center of gravity and maximum of a closed area around a peak of the calibration
+wavelength data. The area is defined in the function `find_projected_positions`.
 
-    #FIXME: update doc
 """
 struct LineStat
     cog_int::Float64 # intensity of center of gravity
@@ -298,11 +298,11 @@ end
 find the positions of each wavelength rays in the calibration 'd_cal' along its first
 index coordinates. The results are stored in 'C_paths', a vector containing for each 
 calibrated wavelength, a vector of their projected positions. The projection is 
-defined thanks to the angle `ϕ_λ` which must be in radian.
+defined thanks to the angle `ϕ_λ` which must be in degrees.
 
 Keywords can be given as to change parameters in the 'find_projected_positions' 
 function.
-#FIXME: update doc
+
 """
 function find_spectral_line_paths(d_cal::AbstractArray{Float64,2}, 
     bpm::AbstractArray{Float64,2},
@@ -312,7 +312,7 @@ function find_spectral_line_paths(d_cal::AbstractArray{Float64,2},
     
     C_paths = Vector{Point{Float64}}[]
     for l in L_peak
-        push!(C_paths, find_projected_positions(d_cal, bpm, l, ϕ_λ; kwds...))
+        push!(C_paths, find_projected_positions(d_cal, bpm, l, ϕ_λ*deg; kwds...))
     end
     
     return C_paths
@@ -321,9 +321,22 @@ end
 
 
 """
+    find_projected_positions(d_cal, bpm, l, ϕ_λ) -> Z
 
+yields a list `Z` containing the coordinates of the peaks along the spectral band
+located around the projected position `l` of `d_cal`, defined by the angle
+`ϕ_λ` in radians. The spectral band is sliced into several window boxes of height one pixel
+and width the value specified by the keyword `half_width_box` (10 pixels by
+defaults).
 
-#FIXME: update doc
+The peaks of intensity higher than `ltol` (0.1 by default) are then detected in the
+windows via a routine `find_peak_in_box` that detects the position of both the
+center of gravity and the maximum value in the small window, while accounting
+for bad-pixels via the map `bpm`.
+
+By setting the keyword `sel_max = true`, the maximum of each window is selected
+as the position of the peak. Otherwise, the default behavior is to select the
+center of gravity inside the window.
 
 """
 function find_projected_positions(d_cal::AbstractArray{Float64,2}, 
@@ -341,7 +354,7 @@ function find_projected_positions(d_cal::AbstractArray{Float64,2},
     jmin, jmax = firstindex(axes(d_cal,2)), lastindex(axes(d_cal,2))
     lsummax = typemin(Float64)
     for i in imin:imax
-        j_center = round(Int, (l - cosphi*i)/sinphi)
+        j_center = round(Int, (l - sinphi*i)/cosphi)
         J = max(jmin, j_center-half_width_box):min(jmax, j_center+half_width_box) # boxing of peak
         stat = find_peak_in_box(d_cal, bpm, i, J)
         if stat.cog_int > 0
@@ -366,10 +379,9 @@ end
 """
     find_peak_in_box(d_cal, bpm, i, J_box) -> LineStat
 
-yields a LineStat structure containing the peak information at the first dimension
-index `i` and in the `J_box`.
+yields a `LineStat` structure containing the peak information at the first dimension
+index `i` and in the `J_box` window.
 
-#FIXME: update doc
 """
 function find_peak_in_box(d_cal::AbstractArray{Float64,2},
     bpm::AbstractArray{Float64,2},
@@ -401,21 +413,32 @@ end
 
 
 """
-#FIXME: update doc
+    find_edges_coro(ϕ_λ, d_cal, bpm, L_peak) -> edges_coro
+
+yields the coordinates of the edges of the coronagraphic mask for each spectral
+band in `d_cal`. Each spectral band located around columns indices in `L_peak`
+is isolated in a small window of width defined by the keyword `half_width_box`
+(10 pixels by default) and projected following the angle `ϕ_λ + 90` degrees,
+while accounting for bad-pixels flagged in the `bpm` map. For each profile, the
+procedure `find_edges` is used to detect the edges of the coronagraphic mask.
+
+A `study` keyword can be given to plot the detected edges on the calibration
+data (`study = Val(:log)`) or so that the function returns the list of edges and
+a profil to control the detection.
+
 """
 function find_edges_coro(ϕ_λ::Float64, 
     d_cal::AbstractArray{Float64,2},
     bpm::AbstractArray{Float64,2},
     L_peak::AbstractVector;
     half_width_box::Int = 10,
-    plot::Bool = false,
-    study::Bool = false)
+    study::Val = Val(false))
 
-    sinphi, cosphi = sincos(ϕ_λ)
+    sinphi, cosphi = sincos(ϕ_λ*deg)
     imin, imax = firstindex(axes(d_cal,1)), lastindex(axes(d_cal,1))
     jmin, jmax = firstindex(axes(d_cal,2)), lastindex(axes(d_cal,2))
     edges_coro = Vector{Point{Float64}}[]
-    if study
+    if study === Val(:prof)
         prof_stud = []
         ind_prof_stud = []
         ind_edges_stud = []
@@ -426,7 +449,7 @@ function find_edges_coro(ϕ_λ::Float64,
         mask = zeros(size(d_cal))
         for i in imin:imax
             if i > 50 && i < 920 # select field of view
-                j_center = round(Int, (L_peak[l] - cosphi*i)/sinphi)
+                j_center = round(Int, (L_peak[l] - sinphi*i)/cosphi)
                 J = max(jmin, j_center-half_width_box):min(jmax, j_center+half_width_box)
                 mask[i,J] .= bpm[i,J]
             end
@@ -442,22 +465,22 @@ function find_edges_coro(ϕ_λ::Float64,
         lamp_clip[(lamp_clip .- med)./sqrt(vari) .> 4] .= med
 
         # get angular separation profil of ray (angle must be ϕ_λ + 90)
-        wgts, ind_prof, prof = project(lamp_clip, ϕ_λ + 90deg; weights=mask)
+        wgts, ind_prof, prof = project(lamp_clip, ϕ_λ*deg + 90deg; weights=mask)
 
         # get ends of edges of segment
-        if study
+        if study === Val(:prof)
             edges, tol = find_edges(prof; weights=wgts, study=study)
         else
             edges = find_edges(prof; weights=wgts)
         end
 
-        i_l_d = L_peak[l]*cosphi - ind_prof[edges[1]]*sinphi
-        j_l_d = L_peak[l]*sinphi + ind_prof[edges[1]]*cosphi
-        i_l_u = L_peak[l]*cosphi - ind_prof[edges[2]]*sinphi
-        j_l_u = L_peak[l]*sinphi + ind_prof[edges[2]]*cosphi
+        i_l_d = L_peak[l]*sinphi + ind_prof[edges[1]]*cosphi
+        j_l_d = L_peak[l]*cosphi + ind_prof[edges[1]]*sinphi
+        i_l_u = L_peak[l]*sinphi + ind_prof[edges[2]]*cosphi
+        j_l_u = L_peak[l]*cosphi + ind_prof[edges[2]]*sinphi
         
         push!(edges_coro, [Point(i_l_d, j_l_d), Point(i_l_u, j_l_u)])
-        if study && (l == 4)
+        if (study === Val(:prof)) && (l == 4)
             prof_stud = prof
             ind_prof_stud = ind_prof
             ind_edges_stud = [i_l_d, i_l_u]
@@ -465,19 +488,19 @@ function find_edges_coro(ϕ_λ::Float64,
         end
     end
 
-    if plot
+    if study === Val(:log)
         figure()
         plt.imshow(d_cal .* bpm, origin="lower", interpolation="none", 
                    aspect="auto", cmap="gnuplot")
         plt.colorbar()
         for E_l in edges_coro
-            plt.scatter(E_l[1][2], E_l[1][1], color="r", marker="x")
-            plt.scatter(E_l[2][2], E_l[2][1], color="r", marker="x")
+            plt.scatter(E_l[1][2] - 1, E_l[1][1] - 1, color="r", marker="x")
+            plt.scatter(E_l[2][2] - 1, E_l[2][1] - 1, color="r", marker="x")
         end
         plt.tight_layout()
     end
     
-    if study
+    if study === Val(:prof)
         return edges_coro, prof_stud, ind_prof_stud, ind_edges_stud, tol_stud
     else
         return edges_coro
@@ -506,7 +529,6 @@ as:
 
 with `vmin = minimum(vect)` and where absolute and relative tolerances can be
 specified by keywords `atol` and `rtol`.
-#FIXME: update doc
 
 """
 function find_edges(vect::AbstractVector;
@@ -576,7 +598,7 @@ function find_edges(vect::AbstractVector;
         end
     end
 
-    if study === Val(true)
+    if study === Val(:prof)
         return inds, tol
     else
         return inds
@@ -589,7 +611,14 @@ end
 ########## Fit of dispersion laws ##########
 
 """
-#FIXME: update doc
+    fit_spectral_law(C_paths, calibrated_wavelengths, polynom_carac) -> coefs
+
+solves the Normal equations from the mean square minimization to estimate the
+coefficients of the spectral dispersion law polynomial, defined by
+`polynom_carac` (dimension, degree). The fit uses the wavelength of each
+calibrated laser source, defined by `calibrated_wavelengths`, and the
+coordinates of the peaks of each spectral band on the detector, contained in `C_paths`.
+
 """
 function fit_spectral_law(C_paths::Vector{Vector{Point{Float64}}},
     calibrated_wavelengths::AbstractVector{Float64},
@@ -605,7 +634,12 @@ end
 
 
 """
-#FIXME: update doc
+    fit_spatial_law(Edges, polynom_carac) -> coefs
+
+fits the polynomial spatial dispersion law (via a mean square minimization),
+defined by `polynom_carac`, using the edges coordinates of the coronagraphic
+mask, contained in `Edges`.
+
 """
 function fit_spatial_law(Edges::Vector{Vector{Point{Float64}}},
     polynom_carac::NTuple{2,Int})
@@ -635,7 +669,11 @@ end
 
 
 """
-#FIXME: update doc
+    build_model_fit(polynom_carac, Pts, data) -> H, d
+
+yields the Vandermonde matrix `H` coming from the mean square fit of a
+polynomial law and the data `d` used to fit the different dispersion laws.
+
 """
 function build_model_fit(polynom_carac::NTuple{2,Int},
     Pts::Vector{Vector{Point{Float64}}},
@@ -661,6 +699,11 @@ end
 
 
 """
+    build_map(P, s) -> map
+
+builds the 2D coordinates map of size `s`, using the polynomial law `P` of
+structure `PolynLaw`.
+
 """
 function build_map(P::PolynLaw{N,T,D},
     s::Tuple{Int,Int}) where {N,T,D}
