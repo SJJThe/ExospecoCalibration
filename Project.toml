@@ -13,8 +13,7 @@ TwoDimensional = "1907e7ba-7586-4310-a2ba-dd01462aeb50"
 
 [compat]
 EasyFITS = "0.2.5"
-julia = "1.7"
 OptimPackNextGen = "0.3"
 PyPlot = "2.10"
 TwoDimensional = "0.2.1"
-
+julia = "1.7, 1.9"

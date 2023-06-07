@@ -1,6 +1,22 @@
 
 
 """
+    GeoCalib(rho, lambda, mask)
+
+Yields a `GeoCalib` structure which contains the angular separation map `rho`, the 
+wavelength map `lambda` and a mask where invalid pixels are flagged by a 0 value.
+
+The `Base` functions `axes`, `size` and `eltype` can be applied to this structure.
+
+It is possible to save a `GeoCalib` structure `G` as a .fits file using the `EasyFITS`
+package:
+
+    EasyFITS.writefits(PATH, G; overwrite=true)
+
+and to load the structure:
+
+    EasyFITS.readfits(GeoCalib, PATH)
+
 """
 struct GeoCalib{T<:AbstractFloat,R<:AbstractMatrix{T},L<:AbstractMatrix{T},
                 M<:AbstractMatrix{T}}
@@ -30,12 +46,11 @@ Base.show(io::IO, G::GeoCalib{T}) where {T} = begin
     print(io,"\n - mask of valid data `mask` : ",typeof(G.mask))
 end
 
+#FIXME: extend Base.write and 
+
 # Extend EasyFITS method to provide HDU name and revision number.
 EasyFITS.hduname(::Type{<:GeoCalib}) = ("GEOMETRIC-CALIBRATION", 1)
 
-"""
-give exemple writefits(...; overwrite=true)
-"""
 function EasyFITS.writefits(path::AbstractString,
     G::GeoCalib{T};
     kwds...) where {T}
@@ -68,7 +83,14 @@ end
 
 
 """
-#FIXME: update doc
+    PolynLaw{N,T,D}(a)
+
+Yields a structure containing the `N`-dimensional polynomial law of degree `D` defined by
+the coefficients in `a` of type `T`.
+
+Write `P(x)` to compute the value of the polynomial `P` at `x` (either a `Real` for 1D 
+polynomials or a `Point` for 2D polynomials).
+
 """
 struct PolynLaw{N,T,D} <: Function
     coefs::AbstractVector{T}
@@ -99,14 +121,13 @@ end
 
 
 """
-    Polyn(coefs)
+    PolynMdl{N,T,D}(x)
 
-Structure which contains the `L` coefficients of a `N` dimensional polynomial of degree `D`.
+Yieds a list of the parameter `x` up to the powers of the decomposition of the 
+`N`-dimensional polynomial of degree `D`.
 
-Example of stored coefficients for a 2D polynomials:
-            P(x,y) = a_1 + a_2*x + a_3*y + a_4*x^2 + a_5*x*y + a_6*y^2 + ...
+This structure is used in the computation of the polynomial law structure `PolynLaw`.
 
-            #FIXME: update doc
 """
 struct PolynMdl{N,T,D} <: Function
     mdl::AbstractVector{AbstractVector{T}}
