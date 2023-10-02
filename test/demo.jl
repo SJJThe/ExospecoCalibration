@@ -8,8 +8,8 @@ const plt = PyPlot
 # Load data
 path_to_data = joinpath(@__DIR__, "..", "data")
 
-d_cal = read(FitsArray, joinpath(path_to_data, "preprocessed_lamp.fits.gz"))
-bpm = read(FitsArray, joinpath(path_to_data, "bad_pixels_map.fits.gz"))
+d_cal = readfits(joinpath(path_to_data, "preprocessed_lamp.fits.gz"))
+bpm = readfits(joinpath(path_to_data, "bad_pixels_map.fits.gz"))
 
 
 # Parameters of the dispersion laws (dimensions, degree)
@@ -36,4 +36,6 @@ Geo_masked = select_region_of_interest(Geo; rho_bnds=rho_bnds,
 writefits(joinpath(path_to_data, "geometric_calibration.fits"), 
           Geo_masked; overwrite=true)
 
+# Read the saved file
+readfits(GeoCalib, joinpath(path_to_data, "geometric_calibration.fits"))
 

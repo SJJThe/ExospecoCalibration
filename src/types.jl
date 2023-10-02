@@ -60,7 +60,7 @@ function EasyFITS.writefits(path::AbstractString,
     arr[:,:,2] = lambda
     arr[:,:,3] = mask
     
-    name, vers = EasyFITS.hduname(G)
+    name, vers = EasyFITS.hduname(typeof(G))
     hdr = FitsHeader("HDUNAME" => name, 
                      "HDUVERS" => vers,
                      "SLICE_1" => "Angular separation map [mas]",
@@ -73,7 +73,7 @@ end
 
 function EasyFITS.readfits(::Type{GeoCalib}, path::AbstractString)
     
-    arr = read(FitsArray, path)
+    arr = readfits(path)
 
     return GeoCalib(arr[:,:,1], arr[:,:,2], arr[:,:,3])
 end
